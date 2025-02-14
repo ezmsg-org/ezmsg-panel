@@ -11,6 +11,8 @@ from param.parameterized import Event
 
 from ezmsg.util.messagereplay import MessageReplay, ReplayStatusMessage, FileReplayMessage
 
+from .tabbedapp import Tab
+
 class ReplaySettings(ez.Settings):
     data_dir: Path
     name: str = 'Message Replay'
@@ -116,22 +118,27 @@ class ReplayGUI( ez.Unit ):
 
         self.STATE.msg_times = list()
     
+    def content(self) -> panel.viewable.Viewable:
+        return self.STATE.file_selector
+    
+    def controls(self) -> panel.viewable.Viewable:
+        return panel.Column( 
+            self.STATE.message_rate,
+            self.STATE.rate, 
+            self.STATE.rapid,
+            panel.Row(
+                self.STATE.enqueue_button,
+                self.STATE.pause_toggle,
+                self.STATE.stop_button,
+            ),
+            self.STATE.playback_file,
+            self.STATE.playback,
+        )
 
     def panel(self) -> panel.viewable.Viewable:
         return panel.Row(
-            self.STATE.file_selector,
-            panel.Column( 
-                self.STATE.message_rate,
-                self.STATE.rate, 
-                self.STATE.rapid,
-                panel.Row(
-                    self.STATE.enqueue_button,
-                    self.STATE.pause_toggle,
-                    self.STATE.stop_button,
-                ),
-                self.STATE.playback_file,
-                self.STATE.playback,
-            )
+            self.content,
+            self.controls
         )
 
     @ez.publisher(OUTPUT_FILE_REPLAY)
@@ -177,7 +184,7 @@ class ReplayGUI( ez.Unit ):
                 self.STATE.playback.bar_color = 'success' if self.STATE.replay_status.done else 'primary'
 
 
-class Replay(ez.Collection):
+class Replay(ez.Collection, Tab):
     SETTINGS = ReplaySettings
 
     OUTPUT_MESSAGE = ez.InputStream(typing.Any)
@@ -185,6 +192,16 @@ class Replay(ez.Collection):
 
     GUI = ReplayGUI()
     REPLAY = MessageReplay()
+
+    @property
+    def title(self) -> str:
+        return self.SETTINGS.name
+    
+    def content(self) -> panel.viewable.Viewable:
+        return self.GUI.content()
+    
+    def sidebar(self) -> panel.viewable.Viewable:
+        return self.GUI.controls()
 
     def configure(self) -> None:
         self.GUI.apply_settings(self.SETTINGS)

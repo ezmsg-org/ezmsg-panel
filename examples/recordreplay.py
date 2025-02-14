@@ -1,3 +1,4 @@
+import typing
 from dataclasses import field
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from ezmsg.panel.application import Application, ApplicationSettings
 from ezmsg.panel.recorder import Recorder, RecorderSettings
 from ezmsg.panel.replay import Replay, ReplaySettings
 from ezmsg.panel.timeseriesplot import TimeSeriesPlot, TimeSeriesPlotSettings
+from ezmsg.panel.tabbedapp import TabbedApp, Tab
 
 
 class RecordReplaySystemSettings(ez.Settings):
@@ -18,7 +20,7 @@ class RecordReplaySystemSettings(ez.Settings):
         default_factory = ApplicationSettings
     )
 
-class RecordReplaySystem(ez.Collection):
+class RecordReplayApp(ez.Collection, TabbedApp):
 
     SETTINGS = RecordReplaySystemSettings
 
@@ -26,7 +28,6 @@ class RecordReplaySystem(ez.Collection):
     RECORDER = Recorder()
     REPLAY = Replay()
     REPLAY_PLOT = TimeSeriesPlot()
-    APP = Application()
 
     def configure( self ) -> None:
         self.RECORDER.apply_settings( self.SETTINGS.recorder_settings )
@@ -35,13 +36,18 @@ class RecordReplaySystem(ez.Collection):
         self.REPLAY_PLOT.apply_settings( 
             TimeSeriesPlotSettings( time_axis = 'time' ) 
         )
-        self.APP.apply_settings( self.SETTINGS.app_settings )
 
-        self.APP.panels = {
-            'record': self.RECORDER.panel,
-            'replay': self.REPLAY.panel,
-            'replay_plot': self.REPLAY_PLOT.panel
-        }
+    @property
+    def title(self) -> str:
+        return "Record Replay Example"
+    
+    @property
+    def tabs(self) -> typing.List[Tab]:
+        return [
+            self.RECORDER,
+            self.REPLAY,
+            self.REPLAY_PLOT
+        ]
 
     def network( self ) -> ez.NetworkDefinition:
         return ( 
@@ -69,9 +75,15 @@ if __name__ == '__main__':
 
     args = parser.parse_args(namespace = Args)
 
-    system = RecordReplaySystem(
-        RecordReplaySystemSettings(
+    app = Application(
+        ApplicationSettings(
+            name = 'Recorder Test',
+            port = 0
+        )
+    )
 
+    record_replay = RecordReplayApp(
+        RecordReplaySystemSettings(
             recorder_settings = RecorderSettings(
                 name = 'Record',
                 data_dir = args.data_dir
@@ -88,12 +100,14 @@ if __name__ == '__main__':
                 n_ch = 8,
                 dispatch_rate = 'realtime'
             ),
-
-            app_settings = ApplicationSettings(
-                name = 'Recorder Test',
-                port = 0
-            )
         )
     )
 
-    ez.run(RECORDER = system)
+    app.panels = {
+        'record_replay': record_replay.app
+    }
+
+    ez.run(
+        RECORD_REPLAY_APP = record_replay,
+        APP = app,
+    )

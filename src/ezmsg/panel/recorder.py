@@ -12,6 +12,8 @@ from ezmsg.util.messagelogger import MessageLogger
 
 from typing import AsyncGenerator, Any, List, Tuple, Optional
 
+from .tabbedapp import Tab
+
 class RecorderSettings(ez.Settings):
     data_dir: Path
     name: str = 'Message Recorder'
@@ -101,23 +103,27 @@ class RecorderGUI( ez.Unit ):
         )
 
         self.STATE.msg_times = list()
+
+    def controls(self) -> panel.viewable.Viewable:
+        return panel.Column( 
+            self.STATE.message_rate,
+            self.STATE.rec_dir,
+            self.STATE.rec_name,
+            panel.Row(
+                self.STATE.rec_button,
+                self.STATE.stop_button,
+            ),
+            self.STATE.rec_file,
+            self.STATE.rec_msgs,
+        )
     
-
+    def content(self) -> panel.viewable.Viewable:
+        return self.STATE.file_selector
+    
     def panel( self ) -> panel.viewable.Viewable:
-
         return panel.Row(
-            self.STATE.file_selector,
-            panel.Column( 
-                self.STATE.message_rate,
-                self.STATE.rec_dir,
-                self.STATE.rec_name,
-                panel.Row(
-                    self.STATE.rec_button,
-                    self.STATE.stop_button,
-                ),
-                self.STATE.rec_file,
-                self.STATE.rec_msgs,
-            )
+            self.content(),
+            self.controls()
         )
 
     @ez.publisher(OUTPUT_START)
@@ -171,13 +177,23 @@ class RecorderGUI( ez.Unit ):
             self.STATE.n_msgs += 1
 
 
-class Recorder(ez.Collection):
+class Recorder(ez.Collection, Tab):
     SETTINGS = RecorderSettings
 
     INPUT_MESSAGE = ez.InputStream(Any)
 
     GUI = RecorderGUI()
     LOGGER = MessageLogger()
+
+    @property
+    def title(self) -> str:
+        return self.SETTINGS.name
+    
+    def content(self) -> panel.viewable.Viewable:
+        return self.GUI.content()
+    
+    def sidebar(self) -> panel.viewable.Viewable:
+        return self.GUI.controls()
 
     def configure(self) -> None:
         self.GUI.apply_settings(self.SETTINGS)
