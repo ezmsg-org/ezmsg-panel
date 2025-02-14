@@ -1,18 +1,21 @@
 import asyncio
+import typing
 from functools import partial
 
 import panel
 import ezmsg.core as ez
 import numpy as np
+from param.parameterized import Event
 
-from ezmsg.util.messages.axisarray import AxisArray
+from ezmsg.util.messages.axisarray import AxisArray, LinearAxis
+from ezmsg.sigproc.downsample import downsample
 
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource
 from bokeh.models.renderers import GlyphRenderer
 from bokeh.server.contexts import BokehSessionContext
 
-from typing import Dict, Set, Optional, List
+from typing import Dict, Set, Optional
 
 from .tabbedapp import Tab
 
@@ -22,6 +25,7 @@ class ScrollingLinePlotSettings(ez.Settings):
     name: str = 'Scrolling Line Plot'
     time_axis: Optional[str] = None # If not specified, dim 0 is used.
     initial_gain: float = 1.0
+    downsample_factor: int = 1
 
 
 class ScrollingLinePlotState(ez.State):
@@ -33,10 +37,13 @@ class ScrollingLinePlotState(ez.State):
     channelize: panel.widgets.Checkbox
     gain: panel.widgets.FloatInput
     duration: panel.widgets.FloatInput
+    downsample: panel.widgets.IntInput
 
     # Signal Properties
     fs: panel.widgets.Number
     n_time: panel.widgets.Number
+
+    downsampler: typing.Generator[AxisArray, AxisArray, None]
 
 
 class ScrollingLinePlot(ez.Unit, Tab):
@@ -48,13 +55,24 @@ class ScrollingLinePlot(ez.Unit, Tab):
 
     def initialize( self ) -> None:
         self.STATE.queues = set()
-        self.STATE.channelize = panel.widgets.Checkbox( name = 'Channelize', value = True )
-        self.STATE.gain = panel.widgets.FloatInput( name = 'Gain', value = self.SETTINGS.initial_gain )
-        self.STATE.duration = panel.widgets.FloatInput( name = 'Duration (sec)', value = 4.0, start = 0.0 )
+        self.STATE.channelize = panel.widgets.Checkbox(name = 'Channelize', value = True)
+        self.STATE.gain = panel.widgets.FloatInput(name = 'Gain', value = self.SETTINGS.initial_gain, sizing_mode = 'stretch_width')
+        self.STATE.duration = panel.widgets.FloatInput(name = 'Duration (sec)', value = 4.0, start = 0.0, sizing_mode = 'stretch_width')
+        self.STATE.downsample = panel.widgets.IntInput(name = 'Downsample', value = 0, start = 0, step = 1, sizing_mode = 'stretch_width')
+
+        def update_downsampling(e: Event) -> None:
+            self.STATE.downsampler = downsample(
+                axis = self.SETTINGS.time_axis, 
+                factor = 1 if e.new <= 0 else e.new
+            )
+
+        self.STATE.downsample.param.watch(update_downsampling, 'value')
+        self.STATE.downsample.value = self.SETTINGS.downsample_factor # Force update of downsampler
 
         number_kwargs = dict( title_size = '12pt', font_size = '18pt' )
         self.STATE.fs = panel.widgets.Number( name = 'Sampling Rate', format='{value} Hz', **number_kwargs )
         self.STATE.n_time = panel.widgets.Number( name = "Samples per Message", **number_kwargs )
+        
 
     def plot( self ) -> panel.viewable.Viewable:
         queue: "asyncio.Queue[Dict[str, np.ndarray]]" = asyncio.Queue()
@@ -128,8 +146,11 @@ class ScrollingLinePlot(ez.Unit, Tab):
             self.STATE.fs,
             self.STATE.n_time,
             self.STATE.channelize,
-            self.STATE.gain,
-            self.STATE.duration,
+            panel.Row(
+                self.STATE.gain,
+                self.STATE.duration,
+                self.STATE.downsample
+            ),
             title = 'Scrolling Line Plot Controls',
             collapsed = True,
             sizing_mode = 'stretch_width'
@@ -147,8 +168,20 @@ class ScrollingLinePlot(ez.Unit, Tab):
         axis_name = self.SETTINGS.time_axis
         if axis_name is None:
             axis_name = msg.dims[0]
-        axis = msg.get_axis(axis_name)
+        axis_info = msg.ax(axis_name)
+        axis = axis_info.axis
+        assert isinstance(axis, LinearAxis), (
+            "ScrollingLinePlot only compatible with time_axis as LinearAxis"
+        )
+
         fs = 1.0 / axis.gain
+        self.STATE.fs.value = fs
+        self.STATE.n_time.value = axis_info.size
+
+        # Downsample for visualization
+        msg = self.STATE.downsampler.send(msg)
+        q: int = self.STATE.downsample.value # type: ignore
+        fs /= q
 
         with msg.view2d(axis_name) as view:
             
@@ -163,8 +196,6 @@ class ScrollingLinePlot(ez.Unit, Tab):
 
             self.STATE.cur_fs = fs
             self.STATE.cur_t += view.shape[0] / fs
-            self.STATE.fs.value = fs
-            self.STATE.n_time.value = view.shape[0]
 
             for queue in self.STATE.queues:
                 queue.put_nowait( cds_data )
