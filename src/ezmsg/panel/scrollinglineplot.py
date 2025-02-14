@@ -8,7 +8,6 @@ import numpy as np
 from param.parameterized import Event
 
 from ezmsg.util.messages.axisarray import AxisArray, LinearAxis
-from ezmsg.sigproc.downsample import downsample
 
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource
@@ -61,10 +60,14 @@ class ScrollingLinePlot(ez.Unit, Tab):
         self.STATE.downsample = panel.widgets.IntInput(name = 'Downsample', value = 0, start = 0, step = 1, sizing_mode = 'stretch_width')
 
         def update_downsampling(e: Event) -> None:
-            self.STATE.downsampler = downsample(
-                axis = self.SETTINGS.time_axis, 
-                factor = 1 if e.new <= 0 else e.new
-            )
+            try:
+                from ezmsg.sigproc.downsample import downsample
+                self.STATE.downsampler = downsample(
+                    axis = self.SETTINGS.time_axis, 
+                    factor = 1 if e.new <= 0 else e.new
+                )
+            except ImportError:
+                ez.logger.warning('could not import ezmsg-sigproc. downsample not functional')
 
         self.STATE.downsample.param.watch(update_downsampling, 'value')
         self.STATE.downsample.value = self.SETTINGS.downsample_factor # Force update of downsampler
