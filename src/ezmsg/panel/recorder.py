@@ -8,7 +8,7 @@ import ezmsg.core as ez
 
 from param.parameterized import Event
 
-from ezmsg.util.messagelogger import MessageLogger
+from ezmsg.util.messagelogger import MessageLogger, MessageLoggerSettings
 
 from typing import AsyncGenerator, Any, List, Tuple, Optional
 
@@ -18,6 +18,7 @@ class RecorderSettings(ez.Settings):
     data_dir: Path
     name: str = 'Message Recorder'
     msg_rate_window = 2.0 # sec
+    write_period = 0.0 # sec
 
 class RecorderGUIState(ez.State):
 
@@ -197,6 +198,13 @@ class Recorder(ez.Collection, Tab):
 
     def configure(self) -> None:
         self.GUI.apply_settings(self.SETTINGS)
+
+        if self.SETTINGS.write_period > 0:
+            self.LOGGER.apply_settings(
+                MessageLoggerSettings(
+                    write_period = self.SETTINGS.write_period,
+                )
+            )
 
     def network(self) -> ez.NetworkDefinition:
         return (

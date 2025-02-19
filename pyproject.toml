@@ -1,6 +1,6 @@
 [project]
 name = "ezmsg-panel"
-version = "0.6.1"
+version = "0.6.2"
 description = "Panel patterns for ezmsg systems"
 authors = [
   { name = "Griffin Milsap", email = "griffin.milsap@gmail.com" }
