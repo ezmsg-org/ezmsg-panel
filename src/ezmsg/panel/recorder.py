@@ -17,8 +17,8 @@ from .tabbedapp import Tab
 class RecorderSettings(ez.Settings):
     data_dir: Path
     name: str = 'Message Recorder'
-    msg_rate_window = 2.0 # sec
-    write_period = 0.0 # sec
+    msg_rate_window: float = 2.0 # sec
+    write_period: float = 0.0 # sec
 
 class RecorderGUIState(ez.State):
 
