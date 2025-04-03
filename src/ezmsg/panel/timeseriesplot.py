@@ -97,23 +97,23 @@ class TimeSeriesPlot(ez.Collection, Tab):
     BPFILT = ButterworthFilter()
     QUEUE = MessageQueue(MessageQueueSettings(maxsize = 10, leaky = True))
     BPFILT_CONTROL = ButterworthFilterControl()
-    PLOT = ScrollingLinePlot()
+    SCROLLING_PLOT = ScrollingLinePlot()
 
     @property
     def title(self) -> str:
         return self.SETTINGS.name
     
     def content(self) -> panel.viewable.Viewable:
-        return self.PLOT.content()
+        return self.SCROLLING_PLOT.content()
     
     def sidebar(self) -> panel.viewable.Viewable:
         return panel.Column(
-            self.PLOT.sidebar(),
+            self.SCROLLING_PLOT.sidebar(),
             self.BPFILT_CONTROL.controls()
         )
 
     def configure(self) -> None:
-        self.PLOT.apply_settings(self.SETTINGS)
+        self.SCROLLING_PLOT.apply_settings(self.SETTINGS)
 
         filter_settings = ButterworthFilterSettings(
             axis = self.SETTINGS.time_axis
@@ -127,7 +127,7 @@ class TimeSeriesPlot(ez.Collection, Tab):
             (self.BPFILT_CONTROL.OUTPUT_SETTINGS, self.BPFILT.INPUT_FILTER),
             (self.INPUT_SIGNAL, self.BPFILT.INPUT_SIGNAL),
             (self.BPFILT.OUTPUT_SIGNAL, self.QUEUE.INPUT),
-            (self.QUEUE.OUTPUT, self.PLOT.INPUT_SIGNAL),
+            (self.QUEUE.OUTPUT, self.SCROLLING_PLOT.INPUT_SIGNAL),
         )
 
     def panel(self) -> panel.viewable.Viewable:
