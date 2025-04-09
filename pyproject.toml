@@ -7,7 +7,7 @@ authors = [
 ]
 readme = "README.md"
 homepage = "https://github.com/griffinmilsap/ezmsg-panel"
-requires-python = ">=3.10"
+requires-python = ">=3.10.15,<3.13"
 dependencies = [
     "ezmsg>=3.5.0",
     "panel>=1.5.3",
@@ -15,7 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dependencies = [
-    "ezmsg-sigproc>=1.4.2",
+    "ezmsg-sigproc>=1.8.2",
 ]
 
 [build-system]
