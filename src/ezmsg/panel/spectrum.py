@@ -12,15 +12,18 @@ from panel.viewable import Viewable
 
 from .tabbedapp import Tab
 
-from ezmsg.sigproc.spectral import (
-    Spectrum, 
-    SpectrumSettings,
-    SpectralTransform,
-    SpectralOutput,
-    WindowFunction
-)
+try:
+    from ezmsg.sigproc.spectral import (
+        Spectrum, 
+        SpectrumSettings,
+        SpectralTransform,
+        SpectralOutput,
+        WindowFunction
+    )
 
-from ezmsg.sigproc.window import Window, WindowSettings
+    from ezmsg.sigproc.window import Window, WindowSettings
+except ImportError as e:
+    raise ImportError("You need to install ezmsg-sigproc for this functionality")
 
 from param.parameterized import Event
 

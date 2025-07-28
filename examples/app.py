@@ -122,5 +122,5 @@ if __name__ == '__main__':
     app = PanelExample(settings)
 
     ez.logger.info('Startup can take a while the first time this starts')
-    ez.run(app)
+    ez.run(APP = app)
 

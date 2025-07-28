@@ -1,12 +1,11 @@
 import asyncio
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 import panel
 import ezmsg.core as ez
 
 from ezmsg.util.messages.axisarray import AxisArray
 from ezmsg.util.messagequeue import MessageQueue, MessageQueueSettings
-from ezmsg.sigproc.butterworthfilter import ButterworthFilter, ButterworthFilterSettings
 
 from param.parameterized import Event
 
@@ -19,9 +18,18 @@ from .scrollinglineplot import (
     ScrollingLinePlotSettings, 
 )
 
+try:
+    from ezmsg.sigproc.butterworthfilter import ButterworthFilter, ButterworthFilterSettings
+
+except ImportError:
+    ButterworthFilter = None
+
+    @dataclass
+    class ButterworthFilterSettings:
+        ...
 
 class ButterworthFilterControlState(ez.State):
-    queue: "asyncio.Queue[ButterworthFilterSettings]"
+    queue: asyncio.Queue[ButterworthFilterSettings]
 
     # Controls for Butterworth Filter
     order: panel.widgets.IntInput
@@ -35,7 +43,7 @@ class ButterworthFilterControl(ez.Unit):
 
     OUTPUT_SETTINGS = ez.OutputStream(ButterworthFilterSettings)
 
-    def initialize(self) -> None:
+    async def initialize(self) -> None:
         self.STATE.queue = asyncio.Queue()
 
         # Spectrum Settings
@@ -94,9 +102,13 @@ class TimeSeriesPlot(ez.Collection, Tab):
 
     INPUT_SIGNAL = ez.InputStream(AxisArray)
 
-    BPFILT = ButterworthFilter()
+    BPFILT = None
+    BPFILT_CONTROL = None
+    if ButterworthFilter is not None:
+        BPFILT = ButterworthFilter()
+        BPFILT_CONTROL = ButterworthFilterControl()
+
     QUEUE = MessageQueue(MessageQueueSettings(maxsize = 10, leaky = True))
-    BPFILT_CONTROL = ButterworthFilterControl()
     SCROLLING_PLOT = ScrollingLinePlot()
 
     @property
@@ -107,28 +119,36 @@ class TimeSeriesPlot(ez.Collection, Tab):
         return self.SCROLLING_PLOT.content()
     
     def sidebar(self) -> panel.viewable.Viewable:
-        return panel.Column(
-            self.SCROLLING_PLOT.sidebar(),
-            self.BPFILT_CONTROL.controls()
-        )
+        bar = panel.Column(self.SCROLLING_PLOT.sidebar())
+        if self.BPFILT_CONTROL is not None:
+            bar.append(self.BPFILT_CONTROL.controls())
+        return bar
 
     def configure(self) -> None:
         self.SCROLLING_PLOT.apply_settings(self.SETTINGS)
 
-        filter_settings = ButterworthFilterSettings(
-            axis = self.SETTINGS.time_axis
-        )
+        if self.BPFILT is not None and self.BPFILT_CONTROL is not None:
+            filter_settings = ButterworthFilterSettings(
+                axis = self.SETTINGS.time_axis
+            )
 
-        self.BPFILT_CONTROL.apply_settings(filter_settings)
-        self.BPFILT.apply_settings(filter_settings)
+            self.BPFILT_CONTROL.apply_settings(filter_settings)
+            self.BPFILT.apply_settings(filter_settings)
 
     def network(self) -> ez.NetworkDefinition:
-        return (
-            (self.BPFILT_CONTROL.OUTPUT_SETTINGS, self.BPFILT.INPUT_FILTER),
-            (self.INPUT_SIGNAL, self.BPFILT.INPUT_SIGNAL),
-            (self.BPFILT.OUTPUT_SIGNAL, self.QUEUE.INPUT),
-            (self.QUEUE.OUTPUT, self.SCROLLING_PLOT.INPUT_SIGNAL),
-        )
+        if self.BPFILT is not None and self.BPFILT_CONTROL is not None:
+            return (
+                (self.BPFILT_CONTROL.OUTPUT_SETTINGS, self.BPFILT.INPUT_FILTER),
+                (self.INPUT_SIGNAL, self.BPFILT.INPUT_SIGNAL),
+                (self.BPFILT.OUTPUT_SIGNAL, self.QUEUE.INPUT),
+                (self.QUEUE.OUTPUT, self.SCROLLING_PLOT.INPUT_SIGNAL),
+            )
+        else:
+            return (
+                (self.INPUT_SIGNAL, self.QUEUE.INPUT),
+                (self.QUEUE.OUTPUT, self.SCROLLING_PLOT.INPUT_SIGNAL)
+            )
+
 
     def panel(self) -> panel.viewable.Viewable:
         return panel.Row(

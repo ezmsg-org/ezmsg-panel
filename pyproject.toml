@@ -15,7 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 sigproc = [
-    "ezmsg-sigproc<=1.8.2",
+    "ezmsg-sigproc<2.0",
 ]
 
 [build-system]

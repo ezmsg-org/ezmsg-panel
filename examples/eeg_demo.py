@@ -3,10 +3,15 @@ from dataclasses import field
 
 import ezmsg.core as ez
 
+try:
+    from ezmsg.sigproc.synth import EEGSynth, EEGSynthSettings
+except ImportError:
+    raise ImportError("You need to install ezmsg-sigproc for this example")
+
+
 from ezmsg.panel.application import Application, ApplicationSettings
 from ezmsg.panel.spectrum import SpectrumPlot, SpectrumPlotSettings
 from ezmsg.panel.timeseriesplot import TimeSeriesPlot, TimeSeriesPlotSettings
-from ezmsg.sigproc.synth import EEGSynth, EEGSynthSettings
 
 
 class EEGSpectrumSettings(ez.Settings):
