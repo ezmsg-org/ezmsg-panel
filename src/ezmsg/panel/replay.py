@@ -53,7 +53,7 @@ class ReplayGUI( ez.Unit ):
     OUTPUT_STOP = ez.OutputStream(bool)
     OUTPUT_PAUSE = ez.OutputStream(bool)
 
-    def initialize( self ) -> None:
+    async def initialize( self ) -> None:
 
         self.STATE.file_queue = asyncio.Queue()
         self.STATE.stop_queue = asyncio.Queue()

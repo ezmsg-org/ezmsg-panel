@@ -58,7 +58,7 @@ class SpectrumControl(ez.Unit):
     OUTPUT_SPECTRUM_SETTINGS = ez.OutputStream(SpectrumSettings)
     OUTPUT_WINDOW_SETTINGS = ez.OutputStream(WindowSettings)
 
-    def initialize(self) -> None:
+    async def initialize(self) -> None:
         self.STATE.spectrum_queue = asyncio.Queue()
         self.STATE.window_queue = asyncio.Queue()
 

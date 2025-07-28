@@ -52,7 +52,7 @@ class ScrollingLinePlot(ez.Unit, Tab):
 
     INPUT_SIGNAL = ez.InputStream(AxisArray)
 
-    def initialize( self ) -> None:
+    async def initialize( self ) -> None:
         self.STATE.queues = set()
         self.STATE.channelize = panel.widgets.Checkbox(name = 'Channelize', value = True)
         self.STATE.gain = panel.widgets.FloatInput(name = 'Gain', value = self.SETTINGS.initial_gain, sizing_mode = 'stretch_width')

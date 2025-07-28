@@ -53,7 +53,7 @@ class RecorderGUI( ez.Unit ):
     OUTPUT_STOP = ez.OutputStream(Path)
     INPUT_STOP = ez.InputStream(Path)
 
-    def initialize( self ) -> None:
+    async def initialize( self ) -> None:
 
         self.STATE.start_queue = asyncio.Queue()
         self.STATE.stop_queue = asyncio.Queue()
