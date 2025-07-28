@@ -228,7 +228,7 @@ sigproc = [
 [package.metadata]
 requires-dist = [
     { name = "ezmsg", specifier = ">=3.5.0" },
-    { name = "ezmsg-sigproc", marker = "extra == 'sigproc'", specifier = "<2.0" },
+    { name = "ezmsg-sigproc", marker = "extra == 'sigproc'", specifier = ">=1.8.2,<2.0" },
     { name = "panel", specifier = ">=1.5.3" },
 ]
 provides-extras = ["sigproc"]

@@ -1,6 +1,6 @@
 [project]
 name = "ezmsg-panel"
-version = "0.6.5"
+version = "0.6.6"
 description = "Panel patterns for ezmsg systems"
 authors = [
   { name = "Griffin Milsap", email = "griffin.milsap@gmail.com" }
@@ -15,7 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 sigproc = [
-    "ezmsg-sigproc<2.0",
+    "ezmsg-sigproc>=1.8.2,<2.0",
 ]
 
 [build-system]
