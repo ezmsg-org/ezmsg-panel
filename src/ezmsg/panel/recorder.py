@@ -1,27 +1,24 @@
 import asyncio
 import time
-
 from pathlib import Path
+from typing import Any, AsyncGenerator, List, Optional, Tuple
 
-import panel
 import ezmsg.core as ez
-
-from param.parameterized import Event
-
+import panel
 from ezmsg.util.messagelogger import MessageLogger, MessageLoggerSettings
-
-from typing import AsyncGenerator, Any, List, Tuple, Optional
+from param.parameterized import Event
 
 from .tabbedapp import Tab
 
+
 class RecorderSettings(ez.Settings):
     data_dir: Path
-    name: str = 'Message Recorder'
-    msg_rate_window: float = 2.0 # sec
-    write_period: float = 0.0 # sec
+    name: str = "Message Recorder"
+    msg_rate_window: float = 2.0  # sec
+    write_period: float = 0.0  # sec
+
 
 class RecorderGUIState(ez.State):
-
     # Diagnostic Widgets
     message_rate: panel.widgets.Number
 
@@ -37,12 +34,12 @@ class RecorderGUIState(ez.State):
     # Support
     msg_times: List[float]
     cur_rec: Optional[Path] = None
-    start_queue: 'asyncio.Queue[Path]'
-    stop_queue: 'asyncio.Queue[Path]'
+    start_queue: "asyncio.Queue[Path]"
+    stop_queue: "asyncio.Queue[Path]"
     n_msgs: int = 0
 
-class RecorderGUI( ez.Unit ):
 
+class RecorderGUI(ez.Unit):
     SETTINGS = RecorderSettings
     STATE = RecorderGUIState
 
@@ -53,32 +50,31 @@ class RecorderGUI( ez.Unit ):
     OUTPUT_STOP = ez.OutputStream(Path)
     INPUT_STOP = ez.InputStream(Path)
 
-    async def initialize( self ) -> None:
-
+    async def initialize(self) -> None:
         self.STATE.start_queue = asyncio.Queue()
         self.STATE.stop_queue = asyncio.Queue()
 
-        self.SETTINGS.data_dir.mkdir(parents = True, exist_ok = True)
+        self.SETTINGS.data_dir.mkdir(parents=True, exist_ok=True)
         self.STATE.file_selector = panel.widgets.FileSelector(self.SETTINGS.data_dir)
 
-        self.STATE.rec_dir = panel.widgets.TextInput(name = 'Recording Subdirectory')
-        self.STATE.rec_name = panel.widgets.TextInput(name = 'Recording Name')
-        self.STATE.rec_button = panel.widgets.Button(name = 'Start', width = 50)
+        self.STATE.rec_dir = panel.widgets.TextInput(name="Recording Subdirectory")
+        self.STATE.rec_name = panel.widgets.TextInput(name="Recording Name")
+        self.STATE.rec_button = panel.widgets.Button(name="Start", width=50)
 
         def start_rec(*events: Event) -> None:
             self.STATE.rec_button.disabled = True
             rec_dir = self.STATE.rec_dir.value
             rec_name = self.STATE.rec_name.value
-            rec_path = self.SETTINGS.data_dir 
+            rec_path = self.SETTINGS.data_dir
             rec_path = rec_path / rec_dir if rec_dir else rec_path
-            out_fname = time.strftime('%Y%m%dT%H%M%S')
-            out_fname = f'{rec_name}_{out_fname}' if rec_name else out_fname
-            rec_path = rec_path / f'{out_fname}.txt'
+            out_fname = time.strftime("%Y%m%dT%H%M%S")
+            out_fname = f"{rec_name}_{out_fname}" if rec_name else out_fname
+            rec_path = rec_path / f"{out_fname}.txt"
             self.STATE.start_queue.put_nowait(rec_path)
 
         self.STATE.rec_button.on_click(start_rec)
 
-        self.STATE.stop_button = panel.widgets.Button(name = 'Stop', width = 50)
+        self.STATE.stop_button = panel.widgets.Button(name="Stop", width=50)
         self.STATE.stop_button.disabled = True
 
         def stop_rec(*events: Event) -> None:
@@ -87,26 +83,22 @@ class RecorderGUI( ez.Unit ):
 
         self.STATE.stop_button.on_click(stop_rec)
 
-        self.STATE.rec_file = panel.widgets.StaticText(name = "Recording", value = '-' )
+        self.STATE.rec_file = panel.widgets.StaticText(name="Recording", value="-")
 
-        number_kwargs = dict(title_size = '12pt', font_size = '18pt')
+        number_kwargs = dict(title_size="12pt", font_size="18pt")
 
         self.STATE.message_rate = panel.widgets.Number(
-            name = 'Incoming Message Rate', 
-            format = '{value} Hz', 
-            **number_kwargs
+            name="Incoming Message Rate", format="{value} Hz", **number_kwargs
         )
 
         self.STATE.rec_msgs = panel.widgets.Number(
-            format = '{value} msgs', 
-            value = 0, 
-            **number_kwargs
+            format="{value} msgs", value=0, **number_kwargs
         )
 
         self.STATE.msg_times = list()
 
     def controls(self) -> panel.viewable.Viewable:
-        return panel.Column( 
+        return panel.Column(
             self.STATE.message_rate,
             self.STATE.rec_dir,
             self.STATE.rec_name,
@@ -117,15 +109,12 @@ class RecorderGUI( ez.Unit ):
             self.STATE.rec_file,
             self.STATE.rec_msgs,
         )
-    
+
     def content(self) -> panel.viewable.Viewable:
         return self.STATE.file_selector
-    
-    def panel( self ) -> panel.viewable.Viewable:
-        return panel.Row(
-            self.content(),
-            self.controls()
-        )
+
+    def panel(self) -> panel.viewable.Viewable:
+        return panel.Row(self.content(), self.controls())
 
     @ez.publisher(OUTPUT_START)
     async def start_file(self) -> AsyncGenerator:
@@ -154,20 +143,17 @@ class RecorderGUI( ez.Unit ):
         self.STATE.rec_file.loading = False
         self.STATE.file_selector._refresh()
 
-
     @ez.task
     async def update_display(self) -> None:
         t_window = self.SETTINGS.msg_rate_window
         while True:
             await asyncio.sleep(1.0)
             cur_time = time.time()
-            self.STATE.msg_times = [ 
-                t for t in self.STATE.msg_times 
-                if (cur_time - t) < t_window
+            self.STATE.msg_times = [
+                t for t in self.STATE.msg_times if (cur_time - t) < t_window
             ]
             self.STATE.message_rate.value = len(self.STATE.msg_times) / t_window
             self.STATE.rec_msgs.value = self.STATE.n_msgs
-
 
     @ez.subscriber(INPUT_MESSAGE)
     async def on_signal(self, msg: Any) -> None:
@@ -189,10 +175,10 @@ class Recorder(ez.Collection, Tab):
     @property
     def title(self) -> str:
         return self.SETTINGS.name
-    
+
     def content(self) -> panel.viewable.Viewable:
         return self.GUI.content()
-    
+
     def sidebar(self) -> panel.viewable.Viewable:
         return self.GUI.controls()
 
@@ -202,7 +188,7 @@ class Recorder(ez.Collection, Tab):
         if self.SETTINGS.write_period > 0:
             self.LOGGER.apply_settings(
                 MessageLoggerSettings(
-                    write_period = self.SETTINGS.write_period,
+                    write_period=self.SETTINGS.write_period,
                 )
             )
 
@@ -210,16 +196,14 @@ class Recorder(ez.Collection, Tab):
         return (
             (self.INPUT_MESSAGE, self.GUI.INPUT_MESSAGE),
             (self.INPUT_MESSAGE, self.LOGGER.INPUT_MESSAGE),
-
             (self.GUI.OUTPUT_START, self.LOGGER.INPUT_START),
             (self.LOGGER.OUTPUT_START, self.GUI.INPUT_START),
             (self.GUI.OUTPUT_STOP, self.LOGGER.INPUT_STOP),
-            (self.LOGGER.OUTPUT_STOP, self.GUI.INPUT_STOP)
+            (self.LOGGER.OUTPUT_STOP, self.GUI.INPUT_STOP),
         )
-    
+
     def process_components(self) -> Tuple[ez.Component, ...]:
-        return (self.LOGGER, )
+        return (self.LOGGER,)
 
     def panel(self) -> panel.viewable.Viewable:
         return self.GUI.panel()
-
