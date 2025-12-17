@@ -1,28 +1,29 @@
 import asyncio
-import typing
 import time
-
+import typing
 from pathlib import Path
 
-import panel
 import ezmsg.core as ez
-
+import panel
+from ezmsg.util.messagereplay import (
+    FileReplayMessage,
+    MessageReplay,
+    ReplayStatusMessage,
+)
 from param.parameterized import Event
-
-from ezmsg.util.messagereplay import MessageReplay, ReplayStatusMessage, FileReplayMessage
 
 from .tabbedapp import Tab
 
+
 class ReplaySettings(ez.Settings):
     data_dir: Path
-    name: str = 'Message Replay'
-    msg_rate_window = 2.0 # sec
+    name: str = "Message Replay"
+    msg_rate_window = 2.0  # sec
+
 
 class ReplayGUIState(ez.State):
-
     # Diagnostic Widgets
     message_rate: panel.widgets.Number
-    
 
     # Playback Controls
     file_selector: panel.widgets.FileSelector
@@ -36,14 +37,14 @@ class ReplayGUIState(ez.State):
     rate: panel.widgets.FloatInput
 
     # Support
-    file_queue: 'asyncio.Queue[Path]'
-    stop_queue: 'asyncio.Queue[bool]'
-    pause_queue: 'asyncio.Queue[bool]'
+    file_queue: "asyncio.Queue[Path]"
+    stop_queue: "asyncio.Queue[bool]"
+    pause_queue: "asyncio.Queue[bool]"
     msg_times: typing.List[float]
     replay_status: typing.Optional[ReplayStatusMessage] = None
 
-class ReplayGUI( ez.Unit ):
 
+class ReplayGUI(ez.Unit):
     SETTINGS = ReplaySettings
     STATE = ReplayGUIState
 
@@ -53,78 +54,71 @@ class ReplayGUI( ez.Unit ):
     OUTPUT_STOP = ez.OutputStream(bool)
     OUTPUT_PAUSE = ez.OutputStream(bool)
 
-    async def initialize( self ) -> None:
-
+    async def initialize(self) -> None:
         self.STATE.file_queue = asyncio.Queue()
         self.STATE.stop_queue = asyncio.Queue()
         self.STATE.pause_queue = asyncio.Queue()
 
-        self.STATE.rapid = panel.widgets.Checkbox(name = 'Rapid', value = True)
+        self.STATE.rapid = panel.widgets.Checkbox(name="Rapid", value=True)
         self.STATE.rate = panel.widgets.FloatInput(
-            name = 'Playback Rate (Hz, 0.0 = "as recorded")', 
-            value = 0.0,
-            start = 0.0,
-            disabled = True
+            name='Playback Rate (Hz, 0.0 = "as recorded")',
+            value=0.0,
+            start=0.0,
+            disabled=True,
         )
 
-        self.STATE.rapid.link(self.STATE.rate, value = 'disabled')
+        self.STATE.rapid.link(self.STATE.rate, value="disabled")
 
-        self.SETTINGS.data_dir.mkdir(parents = True, exist_ok = True)
+        self.SETTINGS.data_dir.mkdir(parents=True, exist_ok=True)
         self.STATE.file_selector = panel.widgets.FileSelector(self.SETTINGS.data_dir)
-        self.STATE.enqueue_button = panel.widgets.Button(name = 'Replay Selected', width = 200)
+        self.STATE.enqueue_button = panel.widgets.Button(
+            name="Replay Selected", width=200
+        )
 
         def enqueue(*events: Event) -> None:
             for fpath in self.STATE.file_selector.value:
                 rate = None if self.STATE.rapid.value else self.STATE.rate.value
-                msg = FileReplayMessage(filename = Path(fpath), rate = rate)
+                msg = FileReplayMessage(filename=Path(fpath), rate=rate)
                 self.STATE.file_queue.put_nowait(msg)
 
         self.STATE.enqueue_button.on_click(enqueue)
 
-        self.STATE.stop_button = panel.widgets.Button(name = '⏹️', width = 50)
+        self.STATE.stop_button = panel.widgets.Button(name="⏹️", width=50)
 
         def stop(*events: Event) -> None:
             self.STATE.stop_queue.put_nowait(True)
 
         self.STATE.stop_button.on_click(stop)
 
-        self.STATE.pause_toggle = panel.widgets.Toggle(name = '⏸️', width = 50)
-        
+        self.STATE.pause_toggle = panel.widgets.Toggle(name="⏸️", width=50)
+
         def pause(*events: Event) -> None:
             self.STATE.pause_queue.put_nowait(self.STATE.pause_toggle.value)
             self.STATE.playback.loading = self.STATE.pause_toggle.value
 
-        self.STATE.pause_toggle.param.watch(pause, 'value')
+        self.STATE.pause_toggle.param.watch(pause, "value")
 
-        self.STATE.playback_file = panel.widgets.StaticText(
-            name = "Replaying", 
-            value = '-' 
-        )
-        
+        self.STATE.playback_file = panel.widgets.StaticText(name="Replaying", value="-")
+
         self.STATE.playback = panel.indicators.Progress(
-            value = 100, 
-            max = 100, 
-            bar_color = 'success', 
-            sizing_mode = 'stretch_width'
+            value=100, max=100, bar_color="success", sizing_mode="stretch_width"
         )
 
-        number_kwargs = dict(title_size = '12pt', font_size = '18pt')
+        number_kwargs = dict(title_size="12pt", font_size="18pt")
 
         self.STATE.message_rate = panel.widgets.Number(
-            name = 'Current Replay Message Rate', 
-            format = '{value} Hz', 
-            **number_kwargs
+            name="Current Replay Message Rate", format="{value} Hz", **number_kwargs
         )
 
         self.STATE.msg_times = list()
-    
+
     def content(self) -> panel.viewable.Viewable:
         return self.STATE.file_selector
-    
+
     def controls(self) -> panel.viewable.Viewable:
-        return panel.Column( 
+        return panel.Column(
             self.STATE.message_rate,
-            self.STATE.rate, 
+            self.STATE.rate,
             self.STATE.rapid,
             panel.Row(
                 self.STATE.enqueue_button,
@@ -136,10 +130,7 @@ class ReplayGUI( ez.Unit ):
         )
 
     def panel(self) -> panel.viewable.Viewable:
-        return panel.Row(
-            self.content,
-            self.controls
-        )
+        return panel.Row(self.content, self.controls)
 
     @ez.publisher(OUTPUT_FILE_REPLAY)
     async def start_file(self) -> typing.AsyncGenerator:
@@ -158,7 +149,7 @@ class ReplayGUI( ez.Unit ):
         while True:
             val = await self.STATE.pause_queue.get()
             yield self.OUTPUT_PAUSE, val
-            
+
     @ez.subscriber(INPUT_REPLAY_STATUS)
     async def on_replay_status(self, msg: ReplayStatusMessage) -> None:
         now = time.time()
@@ -171,17 +162,22 @@ class ReplayGUI( ez.Unit ):
         while True:
             await asyncio.sleep(0.2)
             cur_time = time.time()
-            self.STATE.msg_times = [ 
-                t for t in self.STATE.msg_times 
-                if (cur_time - t) < t_window
+            self.STATE.msg_times = [
+                t for t in self.STATE.msg_times if (cur_time - t) < t_window
             ]
             self.STATE.message_rate.value = len(self.STATE.msg_times) / t_window
 
             if self.STATE.replay_status is not None:
-                playback_pct = self.STATE.replay_status.idx / self.STATE.replay_status.total
-                self.STATE.playback_file.value = str(self.STATE.replay_status.filename.name)
+                playback_pct = (
+                    self.STATE.replay_status.idx / self.STATE.replay_status.total
+                )
+                self.STATE.playback_file.value = str(
+                    self.STATE.replay_status.filename.name
+                )
                 self.STATE.playback.value = int(100 * playback_pct)
-                self.STATE.playback.bar_color = 'success' if self.STATE.replay_status.done else 'primary'
+                self.STATE.playback.bar_color = (
+                    "success" if self.STATE.replay_status.done else "primary"
+                )
 
 
 class Replay(ez.Collection, Tab):
@@ -196,10 +192,10 @@ class Replay(ez.Collection, Tab):
     @property
     def title(self) -> str:
         return self.SETTINGS.name
-    
+
     def content(self) -> panel.viewable.Viewable:
         return self.GUI.content()
-    
+
     def sidebar(self) -> panel.viewable.Viewable:
         return self.GUI.controls()
 
@@ -210,16 +206,14 @@ class Replay(ez.Collection, Tab):
         return (
             (self.REPLAY.OUTPUT_MESSAGE, self.OUTPUT_MESSAGE),
             (self.REPLAY.OUTPUT_REPLAY_STATUS, self.OUTPUT_REPLAY_STATUS),
-
             (self.GUI.OUTPUT_FILE_REPLAY, self.REPLAY.INPUT_FILE),
             (self.GUI.OUTPUT_STOP, self.REPLAY.INPUT_STOP),
             (self.GUI.OUTPUT_PAUSE, self.REPLAY.INPUT_PAUSED),
             (self.REPLAY.OUTPUT_REPLAY_STATUS, self.GUI.INPUT_REPLAY_STATUS),
         )
-    
+
     def process_components(self) -> typing.Tuple[ez.Component, ...]:
-        return (self.REPLAY, )
+        return (self.REPLAY,)
 
     def panel(self) -> panel.viewable.Viewable:
         return self.GUI.panel()
-

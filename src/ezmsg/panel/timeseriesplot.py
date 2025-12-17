@@ -1,32 +1,31 @@
 import asyncio
 from dataclasses import dataclass, replace
+from typing import AsyncGenerator
 
-import panel
 import ezmsg.core as ez
-
-from ezmsg.util.messages.axisarray import AxisArray
+import panel
 from ezmsg.util.messagequeue import MessageQueue, MessageQueueSettings
-
+from ezmsg.util.messages.axisarray import AxisArray
 from param.parameterized import Event
 
-from typing import AsyncGenerator, List
-
+from .scrollinglineplot import (
+    ScrollingLinePlot,
+    ScrollingLinePlotSettings,
+)
 from .tabbedapp import Tab
 
-from .scrollinglineplot import (
-    ScrollingLinePlot, 
-    ScrollingLinePlotSettings, 
-)
-
 try:
-    from ezmsg.sigproc.butterworthfilter import ButterworthFilter, ButterworthFilterSettings
+    from ezmsg.sigproc.butterworthfilter import (
+        ButterworthFilter,
+        ButterworthFilterSettings,
+    )
 
 except ImportError:
     ButterworthFilter = None
 
     @dataclass
-    class ButterworthFilterSettings:
-        ...
+    class ButterworthFilterSettings: ...
+
 
 class ButterworthFilterControlState(ez.State):
     queue: asyncio.Queue[ButterworthFilterSettings]
@@ -47,36 +46,31 @@ class ButterworthFilterControl(ez.Unit):
         self.STATE.queue = asyncio.Queue()
 
         # Spectrum Settings
-        self.STATE.order = panel.widgets.IntInput( 
-            name = 'Filter Order (0 = "Disabled")', 
-            value = 0, 
-            start = 0 
+        self.STATE.order = panel.widgets.IntInput(
+            name='Filter Order (0 = "Disabled")', value=0, start=0
         )
 
-        self.STATE.cuton = panel.widgets.FloatInput( 
-            name = 'Filter Cuton (Hz)', 
-            value = 1.0, 
-            start = 0.0 
+        self.STATE.cuton = panel.widgets.FloatInput(
+            name="Filter Cuton (Hz)", value=1.0, start=0.0
         )
 
-        self.STATE.cutoff = panel.widgets.FloatInput( 
-            name = 'Filter Cutoff (Hz)', 
-            value = 30.0, 
-            start = 0.0 
+        self.STATE.cutoff = panel.widgets.FloatInput(
+            name="Filter Cutoff (Hz)", value=30.0, start=0.0
         )
 
         def enqueue_design(*events: Event) -> None:
-            self.STATE.queue.put_nowait(replace( 
-                self.SETTINGS,
-                order = self.STATE.order.value,
-                cuton = self.STATE.cuton.value,
-                cutoff = self.STATE.cutoff.value
-            ))
+            self.STATE.queue.put_nowait(
+                replace(
+                    self.SETTINGS,
+                    order=self.STATE.order.value,
+                    cuton=self.STATE.cuton.value,
+                    cutoff=self.STATE.cutoff.value,
+                )
+            )
 
-        self.STATE.order.param.watch(enqueue_design, 'value')
-        self.STATE.cuton.param.watch(enqueue_design, 'value')
-        self.STATE.cutoff.param.watch(enqueue_design, 'value')
-
+        self.STATE.order.param.watch(enqueue_design, "value")
+        self.STATE.cuton.param.watch(enqueue_design, "value")
+        self.STATE.cutoff.param.watch(enqueue_design, "value")
 
     @ez.publisher(OUTPUT_SETTINGS)
     async def pub_settings(self) -> AsyncGenerator:
@@ -89,13 +83,14 @@ class ButterworthFilterControl(ez.Unit):
             self.STATE.order,
             self.STATE.cuton,
             self.STATE.cutoff,
-            title = 'Butterworth Filter Controls',
-            collapsed = True,
-            sizing_mode = 'stretch_width'
+            title="Butterworth Filter Controls",
+            collapsed=True,
+            sizing_mode="stretch_width",
         )
 
 
 TimeSeriesPlotSettings = ScrollingLinePlotSettings
+
 
 class TimeSeriesPlot(ez.Collection, Tab):
     SETTINGS = TimeSeriesPlotSettings
@@ -108,16 +103,16 @@ class TimeSeriesPlot(ez.Collection, Tab):
         BPFILT = ButterworthFilter()
         BPFILT_CONTROL = ButterworthFilterControl()
 
-    QUEUE = MessageQueue(MessageQueueSettings(maxsize = 10, leaky = True))
+    QUEUE = MessageQueue(MessageQueueSettings(maxsize=10, leaky=True))
     SCROLLING_PLOT = ScrollingLinePlot()
 
     @property
     def title(self) -> str:
         return self.SETTINGS.name
-    
+
     def content(self) -> panel.viewable.Viewable:
         return self.SCROLLING_PLOT.content()
-    
+
     def sidebar(self) -> panel.viewable.Viewable:
         bar = panel.Column(self.SCROLLING_PLOT.sidebar())
         if self.BPFILT_CONTROL is not None:
@@ -128,9 +123,7 @@ class TimeSeriesPlot(ez.Collection, Tab):
         self.SCROLLING_PLOT.apply_settings(self.SETTINGS)
 
         if self.BPFILT is not None and self.BPFILT_CONTROL is not None:
-            filter_settings = ButterworthFilterSettings(
-                axis = self.SETTINGS.time_axis
-            )
+            filter_settings = ButterworthFilterSettings(axis=self.SETTINGS.time_axis)
 
             self.BPFILT_CONTROL.apply_settings(filter_settings)
             self.BPFILT.apply_settings(filter_settings)
@@ -146,12 +139,8 @@ class TimeSeriesPlot(ez.Collection, Tab):
         else:
             return (
                 (self.INPUT_SIGNAL, self.QUEUE.INPUT),
-                (self.QUEUE.OUTPUT, self.SCROLLING_PLOT.INPUT_SIGNAL)
+                (self.QUEUE.OUTPUT, self.SCROLLING_PLOT.INPUT_SIGNAL),
             )
 
-
     def panel(self) -> panel.viewable.Viewable:
-        return panel.Row(
-            self.content(),
-            self.sidebar()
-        )
+        return panel.Row(self.content(), self.sidebar())
