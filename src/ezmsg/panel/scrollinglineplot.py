@@ -64,28 +64,23 @@ class ScrollingLinePlot(ez.Unit, Tab):
 
         def update_downsampling(e: Event) -> None:
             try:
-                from ezmsg.sigproc.downsample import downsample
+                from ezmsg.sigproc.downsample import DownsampleSettings, DownsampleTransformer
 
-                self.STATE.downsampler = downsample(
-                    axis=self.SETTINGS.time_axis, factor=1 if e.new <= 0 else e.new
+                self.STATE.downsampler = DownsampleTransformer(
+                    settings=DownsampleSettings(
+                        axis=self.SETTINGS.time_axis,
+                        factor=1 if e.new <= 0 else e.new,
+                    )
                 )
             except ImportError:
-                ez.logger.warning(
-                    "could not import ezmsg-sigproc. downsample not functional"
-                )
+                ez.logger.warning("could not import ezmsg-sigproc. downsample not functional")
 
         self.STATE.downsample.param.watch(update_downsampling, "value")
-        self.STATE.downsample.value = (
-            self.SETTINGS.downsample_factor
-        )  # Force update of downsampler
+        self.STATE.downsample.value = self.SETTINGS.downsample_factor  # Force update of downsampler
 
         number_kwargs = dict(title_size="12pt", font_size="18pt")
-        self.STATE.fs = panel.widgets.Number(
-            name="Sampling Rate", format="{value} Hz", **number_kwargs
-        )
-        self.STATE.n_time = panel.widgets.Number(
-            name="Samples per Message", **number_kwargs
-        )
+        self.STATE.fs = panel.widgets.Number(name="Sampling Rate", format="{value} Hz", **number_kwargs)
+        self.STATE.n_time = panel.widgets.Number(name="Samples per Message", **number_kwargs)
 
     def plot(self) -> panel.viewable.Viewable:
         queue: "asyncio.Queue[Dict[str, np.ndarray]]" = asyncio.Queue()
@@ -110,16 +105,10 @@ class ScrollingLinePlot(ez.Unit, Tab):
                 cds_data: Dict[str, np.ndarray] = queue.get_nowait()
 
                 ch_names = [ch for ch in cds_data.keys() if ch != CDS_TIME_DIM]
-                offsets = (
-                    np.arange(len(ch_names))
-                    if self.STATE.channelize.value
-                    else np.zeros(len(ch_names))
-                )
+                offsets = np.arange(len(ch_names)) if self.STATE.channelize.value else np.zeros(len(ch_names))
 
                 cds_data = {
-                    ch: (arr * self.STATE.gain.value) + offsets[ch_names.index(ch)]
-                    if ch != CDS_TIME_DIM
-                    else arr
+                    ch: (arr * self.STATE.gain.value) + offsets[ch_names.index(ch)] if ch != CDS_TIME_DIM else arr
                     for ch, arr in cds_data.items()
                 }
 
@@ -135,9 +124,7 @@ class ScrollingLinePlot(ez.Unit, Tab):
                     rollover=int(self.STATE.duration.value * self.STATE.cur_fs),
                 )
 
-        _ = panel.state.add_periodic_callback(
-            partial(_update, fig, cds, queue, lines), period=50
-        )
+        _ = panel.state.add_periodic_callback(partial(_update, fig, cds, queue, lines), period=50)
 
         def remove_queue(_: BokehSessionContext) -> None:
             self.STATE.queues.remove(queue)
@@ -179,9 +166,7 @@ class ScrollingLinePlot(ez.Unit, Tab):
             axis_name = msg.dims[0]
         axis_info = msg.ax(axis_name)
         axis = axis_info.axis
-        assert isinstance(
-            axis, LinearAxis
-        ), "ScrollingLinePlot only compatible with time_axis as LinearAxis"
+        assert isinstance(axis, LinearAxis), "ScrollingLinePlot only compatible with time_axis as LinearAxis"
 
         fs = 1.0 / axis.gain
         self.STATE.fs.value = fs
